@@ -1,0 +1,91 @@
+esphome:
+  name: $hostname
+  on_boot:
+    priority: 600
+    then:
+      - output.turn_on: enable
+
+esp8266:
+  #board: esp01_1m
+  board: $board
+
+logger:
+  level: DEBUG
+  logs:
+    wifi: INFO
+    mdns: INFO
+    mqtt: INFO
+
+wifi:
+  fast_connect: true
+  power_save_mode: HIGH
+  output_power: 12db
+  ssid: rpwIoT
+  password: viamatteotti92
+  
+mqtt:
+  broker: 192.168.1.113
+    #username:
+    #password: 
+  topic_prefix: /${devicename}
+  birth_message:
+  will_message:
+  on_message:
+    - topic: /${devicename}/esp/ota_mode
+      payload: 'ON'
+      then:
+        - deep_sleep.prevent: deep_sleep_1
+        - logger.log: "OTA mode active. The device will NOT sleep"
+    - topic: /${devicename}/esp/sleep_mode
+      payload: 'ON'
+      then:
+        - deep_sleep.enter: deep_sleep_1
+        - logger.log: "Sleep mode active, you can disable it now"
+
+ota:
+  
+deep_sleep:
+  id: deep_sleep_1
+  run_duration: 500ms
+  sleep_duration: 30min
+
+web_server:
+  port: 80
+
+output:
+  - platform: gpio
+    pin: $valve_open_gpio
+    id: valve_open
+  - platform: gpio
+    pin: $valve_close_gpio
+    id: valve_close
+  - platform: gpio
+    pin: $enable_gpio
+    id: enable
+
+cover:
+  - platform: template
+    name: "Water Valve"
+    id: water_valve
+    assumed_state: true
+    optimistic: true
+    command_retain: true
+    open_action:
+      - output.turn_off: valve_close
+      - output.turn_on: valve_open
+      - delay: 250ms
+      - output.turn_off: valve_open
+      # Remove retained command message to avoid another execution at the next wakeup
+      - mqtt.publish:
+          topic: /${devicename}/cover/water_valve/command
+          retain: true
+          payload:
+    close_action:
+      - output.turn_off: valve_open
+      - output.turn_on: valve_close
+      - delay: 63ms
+      - output.turn_off: valve_close
+      - mqtt.publish:
+          topic: /${devicename}/cover/water_valve/command
+          retain: true
+          payload:
