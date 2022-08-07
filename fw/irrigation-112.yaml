@@ -1,9 +1,0 @@
-substitutions:
-  devicename: irrigation_112
-  hostname: irrigation-112
-  board: esp_wroom_02
-  valve_open_gpio: GPIO12
-  valve_close_gpio: GPIO14
-  enable_gpio: GPIO4
-
-<<: !include gardena.yaml
