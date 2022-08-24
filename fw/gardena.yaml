@@ -4,7 +4,6 @@ esphome:
     priority: 600
     then:
       - output.turn_on: enable
-      - script.execute: run_cycle
 
 esp8266:
   board: $board
@@ -26,7 +25,11 @@ wifi:
 globals:
   - id: on_cycles
     type: int
-    restore_value: yes
+    restore_value: no
+    initial_value: '0'
+  - id: cycles_run
+    type: int
+    restore_value: no
     initial_value: '0'
 
 ### Watering works in 'cycles' of 20 minutes. The valve will stay open for 20min*on_cycles, decrementing on_cycles at each loop
@@ -37,15 +40,31 @@ script:
           condition:
             lambda: 'return id(on_cycles) > 0;'
           then:
+            - logger.log: "Cycles!"
             - if:
                 condition: 
                   lambda: 'return id(water_valve).position == COVER_CLOSED;'
                 then:
+                  - logger.log: "Executing cycle. Opening valve"
                   - cover.open: water_valve
-            - lambda: 'id(on_cycles) = id(on_cycles)-1;'
-            - deep_sleep.enter:
-                id: deep_sleep_1
-                sleep_duration: 20min
+            - mqtt.publish:
+                topic: /${devicename}/watering/cycles
+                retain: true
+                payload:  !lambda |-
+                  return std::to_string(id(on_cycles)-1);
+            - logger.log: "Executed a cycle."
+            - lambda: |-
+                id(deep_sleep_1).set_sleep_duration(1200000); // 20min
+
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(water_valve).position == COVER_OPEN;'
+                then:
+                  - logger.log: "No more cycles. Closing valve"
+                  - cover.close: water_valve
+                  - lambda: |-
+                      id(deep_sleep_1).set_sleep_duration(3600000); // 1h
 
 mqtt:
   broker: mqtt.bonnee.me
@@ -53,18 +72,28 @@ mqtt:
     #password: 
   topic_prefix: /${devicename}
   birth_message:
-    topic: /${devicename}/status
-    payload: online
+    #  topic: /${devicename}/status
+    #  payload: online
   will_message:
-    topic: /${devicename}/status
-    payload: offline
+    #  topic: /${devicename}/status
+    #  payload: offline
   on_message:
     - topic: /${devicename}/watering/cycles
       then:
-        - logger.log: "Cycles command received"
-        - lambda: |-
-            id(on_cycles) = id(on_cycles) + abs(stoi(x));
-        - script.execute: run_cycle
+        - logger.log: 
+            format: "%u cycles run."
+            args: [ 'id(cycles_run)' ]
+        - if:
+            condition:
+              lambda: "return id(cycles_run) == 0;"
+            then:
+              - lambda: |-
+                  id(cycles_run) = 1;
+                  id(on_cycles) = abs(stoi(x));
+              - logger.log: 
+                  format: "Cycles command received. There are a total of %u pending cycles."
+                  args: [ 'id(on_cycles)' ]
+              - script.execute: run_cycle
 
     - topic: /${devicename}/esp/ota_mode
       payload: 'ON'
@@ -114,7 +143,7 @@ cover:
       - mqtt.publish:
           topic: /${devicename}/cover/water_valve/command
           retain: true
-          payload:
+          payload: 
     close_action:
       - output.turn_off: valve_open
       - output.turn_on: valve_close
