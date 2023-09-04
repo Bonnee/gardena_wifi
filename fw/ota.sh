@@ -1,6 +1,6 @@
 #!/bin/sh
 
-mqtt_broker="mqtt.bonnee.me"
+mqtt_broker="mqtt.hvc.bonnee.me"
 
 devname=$1
 hostname=$1

@@ -66,7 +66,7 @@ script:
                       id(deep_sleep_1).set_sleep_duration(3600000); // 1h
 
 mqtt:
-  broker: mqtt.bonnee.me
+  broker: $mqtt_server
     #username:
     #password: 
   topic_prefix: /${devicename}

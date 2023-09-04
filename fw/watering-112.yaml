@@ -1,6 +1,7 @@
 substitutions:
   devicename: watering-112
   hostname: watering-112
+  mqtt_server: mqtt.hvc.bonnee.me
   board: esp_wroom_02
   valve_open_gpio: GPIO14
   valve_close_gpio: GPIO12
